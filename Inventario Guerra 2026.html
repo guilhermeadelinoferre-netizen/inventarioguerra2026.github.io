@@ -1,0 +1,165 @@
+Inventario Guerra 2026
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário Financeiro | Guerra Implementos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .guerra-gradient { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); }
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+
+    <header class="guerra-gradient text-white p-6 shadow-2xl no-print border-b-4 border-orange-500">
+        <div class="container mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-black tracking-tighter italic">GUERRA <span class="text-orange-500 italic">IMPLEMENTOS</span></h1>
+                <p class="text-blue-300 text-xs uppercase tracking-widest font-bold">Auditoria de Inventário & Impacto Financeiro</p>
+            </div>
+            <div class="bg-blue-900/50 p-3 rounded-lg border border-blue-700">
+                <p id="dataAtual" class="text-xs font-mono"></p>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-4 md:p-8">
+        
+        <section class="bg-white p-6 rounded-xl shadow-sm mb-8 no-print border border-slate-200">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-800 uppercase">Importação de Dados</h2>
+                    <p class="text-slate-500 text-sm">Colunas necessárias: <span class="font-bold text-blue-600 italic">Endereço, Código, Descrição, Sistema, Contado, Custo Unitário</span>.</p>
+                </div>
+                <input type="file" id="inputExcel" class="block text-sm text-slate-500 file:mr-4 file:py-2 file:px-6 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-orange-500 file:text-white hover:file:bg-orange-600 cursor-pointer transition-all"/>
+            </div>
+        </section>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-blue-600">
+                <p class="text-xs text-slate-400 uppercase font-black mb-1">Custo Total Contado</p>
+                <p id="custoContado" class="text-2xl font-black text-blue-800">R$ 0,00</p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-red-500">
+                <p class="text-xs text-slate-400 uppercase font-black mb-1">Custo Divergência (Net)</p>
+                <p id="custoDivergencia" class="text-2xl font-black text-red-600">R$ 0,00</p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-slate-800">
+                <p class="text-xs text-slate-400 uppercase font-black mb-1">Itens Auditados</p>
+                <p id="totalItens" class="text-2xl font-black text-slate-800">0</p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-green-500">
+                <p class="text-xs text-slate-400 uppercase font-black mb-1">Acuracidade Global</p>
+                <p id="acuracidade" class="text-2xl font-black text-green-600">0%</p>
+            </div>
+        </div>
+
+        <section class="bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden">
+            <div class="p-4 bg-slate-800 text-white flex justify-between items-center no-print">
+                <h3 class="font-bold uppercase tracking-tighter text-sm">Detalhamento de Inventário por Localização</h3>
+                <button onclick="window.print()" class="bg-white text-slate-800 hover:bg-slate-100 px-6 py-2 rounded-lg text-xs font-black transition-all shadow-lg uppercase">Gerar Relatório PDF</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-600 uppercase text-[10px] font-black">
+                            <th class="p-4 border-b">Endereço</th>
+                            <th class="p-4 border-b">Código</th>
+                            <th class="p-4 border-b">Descrição</th>
+                            <th class="p-4 border-b text-right">Qtd. Sist</th>
+                            <th class="p-4 border-b text-right">Qtd. Cont</th>
+                            <th class="p-4 border-b text-right">Dif.</th>
+                            <th class="p-4 border-b text-right">Custo Unit.</th>
+                            <th class="p-4 border-b text-right">Impacto Financ.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultadoTabela" class="text-xs divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="8" class="p-20 text-center text-slate-400 italic text-sm">Carregue a planilha para visualizar os dados financeiros...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        document.getElementById('dataAtual').innerText = new Date().toLocaleString('pt-BR');
+
+        document.getElementById('inputExcel').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.SheetNames[0];
+                const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
+                processarFinanceiro(jsonData);
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function formatarMoeda(valor) {
+            return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function processarFinanceiro(dados) {
+            const tbody = document.getElementById('resultadoTabela');
+            tbody.innerHTML = '';
+            
+            let totalContadoFinanceiro = 0;
+            let totalDivergenciaFinanceira = 0;
+            let totalItens = 0;
+            let itensCorretos = 0;
+
+            dados.forEach(item => {
+                const endereco = item.Endereço || item.Endereco || 'N/I';
+                const sistema = parseFloat(item.Sistema || 0);
+                const contado = parseFloat(item.Contado || 0);
+                const custoUnit = parseFloat(item['Custo Unitário'] || item['Custo Unitario'] || 0);
+                
+                const diferenca = contado - sistema;
+                const impactoFinanceiro = diferenca * custoUnit;
+                const valorEstoqueContado = contado * custoUnit;
+
+                totalItens++;
+                if (diferenca === 0) itensCorretos++;
+                
+                totalContadoFinanceiro += valorEstoqueContado;
+                totalDivergenciaFinanceira += impactoFinanceiro;
+
+                const row = `
+                    <tr class="${diferenca !== 0 ? 'bg-red-50/50' : 'hover:bg-slate-50'} transition-colors">
+                        <td class="p-4 font-bold text-blue-900">${endereco}</td>
+                        <td class="p-4 font-mono">${item.Código || item.Codigo || '-'}</td>
+                        <td class="p-4 text-slate-600 font-medium">${item.Descrição || item.Descricao || '-'}</td>
+                        <td class="p-4 text-right">${sistema}</td>
+                        <td class="p-4 text-right font-bold text-blue-700">${contado}</td>
+                        <td class="p-4 text-right font-black ${diferenca < 0 ? 'text-red-600' : (diferenca > 0 ? 'text-orange-600' : 'text-green-600')}">
+                            ${diferenca > 0 ? '+' : ''}${diferenca}
+                        </td>
+                        <td class="p-4 text-right text-slate-500">${formatarMoeda(custoUnit)}</td>
+                        <td class="p-4 text-right font-black ${impactoFinanceiro < 0 ? 'text-red-600' : (impactoFinanceiro > 0 ? 'text-orange-600' : 'text-slate-800')}">
+                            ${formatarMoeda(impactoFinanceiro)}
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+
+            // Atualização dos Indicadores de Topo
+            document.getElementById('custoContado').innerText = formatarMoeda(totalContadoFinanceiro);
+            document.getElementById('custoDivergencia').innerText = formatarMoeda(totalDivergenciaFinanceira);
+            document.getElementById('totalItens').innerText = totalItens;
+            
+            const acuracidadeFinal = totalItens > 0 ? ((itensCorretos / totalItens) * 100).toFixed(2) : 0;
+            document.getElementById('acuracidade').innerText = acuracidadeFinal + '%';
+        }
+    </script>
+</body>
+</html>
